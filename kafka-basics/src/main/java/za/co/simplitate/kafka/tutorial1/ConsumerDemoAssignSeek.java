@@ -1,4 +1,4 @@
-package tutorial1;
+package za.co.simplitate.kafka.tutorial1;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;

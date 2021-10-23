@@ -1,4 +1,4 @@
-package tutorial1;
+package za.co.simplitate.kafka.tutorial1;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;

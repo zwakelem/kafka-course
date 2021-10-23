@@ -1,5 +1,6 @@
 package za.co.simplitate.kafka.tutorial3;
 
+import com.google.gson.JsonParser;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
@@ -10,6 +11,8 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.elasticsearch.action.bulk.BulkRequest;
+import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.client.RequestOptions;
@@ -54,6 +57,8 @@ public class ElasticSearchConsumer {
         props.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         props.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        props.setProperty(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "100");
+        props.setProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false"); // disable auto commit of records
 
         KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props);
         consumer.subscribe(Arrays.asList(topic));
@@ -65,19 +70,43 @@ public class ElasticSearchConsumer {
         KafkaConsumer<String, String> consumer = createConsumer("twitter_tweets");
         while(true) {
             ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
-            for(ConsumerRecord<String, String> r: records) {
-                IndexRequest indexRequest = new IndexRequest("twitter")
-                        .source(r.value(), XContentType.JSON);
-                IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
-                String id = indexResponse.getId();
-                LOG.info(id);
+            Integer recordCount = records.count();
+            LOG.info("received {} records", recordCount);
+            BulkRequest bulkRequest = new BulkRequest();
+            for (ConsumerRecord<String, String> r : records) {
+                // 2 strategies for creating Ids
+                //  String id = r.topic() + r.partition() + r.offset(); // generic id
+                // twitter specific id
                 try {
-                    Thread.sleep(1000);
+                    String id = extractIdFromTweet(r.value());
+                    IndexRequest indexRequest = new IndexRequest("twitter")
+                            .source(r.value(), XContentType.JSON)
+                            .id(id); // makes consumer idempotent
+                    bulkRequest.add(indexRequest);
+                } catch(Exception ex) {
+                    LOG.warn("bad data: {}", r.value());
+                }
+            }
+            if (recordCount > 0) {
+                BulkResponse bulkItemResponses = client.bulk(bulkRequest, RequestOptions.DEFAULT);
+                LOG.info("commiting the offsets");
+                consumer.commitSync();
+                LOG.info("Offsets have been committed");
+                try {
+                    Thread.sleep(10);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
             }
         }
 //        client.close();
+    }
+
+    private static String extractIdFromTweet(String tweetJson) {
+        JsonParser jsonParser = new JsonParser();
+        return jsonParser.parse(tweetJson)
+                .getAsJsonObject()
+                .get("id_str")
+                .getAsString();
     }
 }

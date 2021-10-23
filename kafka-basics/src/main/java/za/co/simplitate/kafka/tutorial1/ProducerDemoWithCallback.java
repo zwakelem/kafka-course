@@ -1,4 +1,4 @@
-package tutorial1;
+package za.co.simplitate.kafka.tutorial1;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -8,13 +8,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Properties;
-import java.util.concurrent.ExecutionException;
 
-public class ProducerDemoKeys {
+public class ProducerDemoWithCallback {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ProducerDemoKeys.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ProducerDemoWithCallback.class);
 
-    public static void main(String[] args) throws ExecutionException, InterruptedException {
+    public static void main(String[] args) {
 
         // create producer properties
         Properties properties = new Properties();
@@ -28,25 +27,10 @@ public class ProducerDemoKeys {
 
 
         for(int i=0; i<10; i++) {
-            // create a producer record
-            String topic = "first_topic";
-            String value = "first_topic " + i;
-            String key = "id_" + i;
 
-            ProducerRecord<String, String> record = new ProducerRecord<>(topic,key,value);
-            LOG.info("key: {}",key);
-            /*
-                id_0 p1
-                id_1 p0
-                id_2 p2
-                id_3 p0
-                id_4 p2
-                id_5 p2
-                id_6 p0
-                id_7 p2
-                id_8 p1
-                id_9 p2
-             */
+            // create a producer record
+            ProducerRecord<String, String> record = new ProducerRecord<>("first_topic",
+                    "hello world- " + i);
 
             // send data - asynchronous
             producer.send(record, (recordMetadata, e) -> {
@@ -59,7 +43,7 @@ public class ProducerDemoKeys {
                 } else {
                     LOG.error("Error sending message: {}", e.toString());
                 }
-            }).get(); // make send synchronous, degrades performance
+            });
         }
 
 
